@@ -1,11 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "buildCommand": "yarn build",
+  "installCommand": "yarn install",
   "framework": null,
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/health", "destination": "/api" }
+    { "source": "/(.*)", "destination": "/api" }
   ],
   "functions": {
     "api/index.ts": {

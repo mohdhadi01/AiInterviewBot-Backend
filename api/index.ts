@@ -1,8 +1,7 @@
 /**
  * Vercel serverless entry: export the Express app for Vercel's Node runtime.
- * Configure vercel.json with: "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
- * so all requests hit this handler.
+ * Uses the built app from dist/ (created by buildCommand) so paths resolve at runtime.
  */
-import app from '../src/app.js'; // Vercel serverless
+import app from '../dist/src/app.js';
 
 export default app;
