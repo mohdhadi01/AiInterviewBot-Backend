@@ -3,6 +3,7 @@
   "buildCommand": "yarn build",
   "installCommand": "yarn install",
   "framework": null,
+  "outputDirectory": ".",
   "rewrites": [
     { "source": "/(.*)", "destination": "/api" }
   ]
