@@ -1,6 +1,12 @@
 import { type Document, type Model } from 'mongoose';
 /** Matches frontend HistorySession (historySlice). */
 export type DifficultyLevel = 'Junior' | 'Mid' | 'Senior';
+export interface SessionFeedbackDTO {
+    score: number;
+    feedback_summary: string;
+    strengths: string[];
+    weaknesses: string[];
+}
 export interface HistorySessionDTO {
     id: string;
     domain: string;
@@ -9,6 +15,7 @@ export interface HistorySessionDTO {
     focusTopic: string;
     completedAt: string;
     durationSeconds?: number;
+    feedback?: SessionFeedbackDTO;
 }
 export interface ISessionDoc extends Document {
     userId: string;
@@ -18,16 +25,24 @@ export interface ISessionDoc extends Document {
     focusTopic: string;
     completedAt: Date;
     durationSeconds?: number | null;
+    feedback?: {
+        score: number;
+        feedback_summary: string;
+        strengths: string[];
+        weaknesses: string[];
+    } | null;
     createdAt: Date;
 }
 export declare const Session: Model<ISessionDoc>;
 export declare function getSessionsForUser(userId: string, limit?: number): Promise<HistorySessionDTO[]>;
+export declare function getSessionByIdForUser(userId: string, sessionId: string): Promise<HistorySessionDTO | null>;
 export declare function addSessionForUser(userId: string, payload: {
     domain: string;
     trackId?: string | null;
     difficulty: DifficultyLevel;
     focusTopic?: string;
     durationSeconds?: number | null;
+    feedback?: SessionFeedbackDTO | null;
 }): Promise<HistorySessionDTO>;
 export declare function clearSessionsForUser(userId: string): Promise<void>;
 export declare function removeSessionForUser(userId: string, sessionId: string): Promise<boolean>;

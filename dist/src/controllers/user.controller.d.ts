@@ -5,7 +5,9 @@ export declare function createOrUpdateUser(req: Request, res: Response): Promise
 export declare function getPreferredTracksHandler(req: Request, res: Response): Promise<void>;
 /** GET /api/users/:userId/sessions — list interview history (match frontend HistorySession[]). */
 export declare function getSessions(req: Request, res: Response): Promise<void>;
-/** POST /api/users/:userId/sessions — add one session (when user ends interview). */
+/** GET /api/users/:userId/sessions/:sessionId — one session with feedback. */
+export declare function getSession(req: Request, res: Response): Promise<void>;
+/** POST /api/users/:userId/sessions — add one session (when user ends interview). Optional feedback. */
 export declare function addSession(req: Request, res: Response): Promise<void>;
 /** DELETE /api/users/:userId/sessions — clear all sessions for user. */
 export declare function clearSessions(req: Request, res: Response): Promise<void>;

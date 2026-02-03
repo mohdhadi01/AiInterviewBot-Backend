@@ -4,6 +4,7 @@ import { getTracks as getTracksFromDb } from '../models/Track.js';
 import { getPreferredTracks } from '../models/Track.js';
 import {
   getSessionsForUser,
+  getSessionByIdForUser,
   addSessionForUser,
   clearSessionsForUser,
   removeSessionForUser,
@@ -110,16 +111,43 @@ export async function getSessions(req: Request, res: Response): Promise<void> {
   }
 }
 
-/** POST /api/users/:userId/sessions — add one session (when user ends interview). */
+/** GET /api/users/:userId/sessions/:sessionId — one session with feedback. */
+export async function getSession(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.params.userId as string;
+    const sessionId = req.params.sessionId as string;
+    if (!userId || !sessionId) {
+      res.status(400).json({ success: false, error: 'userId and sessionId are required' });
+      return;
+    }
+    const session = await getSessionByIdForUser(userId, sessionId);
+    if (!session) {
+      res.status(404).json({ success: false, error: 'Session not found' });
+      return;
+    }
+    res.json({ success: true, data: session });
+  } catch (err) {
+    console.error('[user] getSession:', err);
+    res.status(500).json({ success: false, error: 'Failed to get session' });
+  }
+}
+
+/** POST /api/users/:userId/sessions — add one session (when user ends interview). Optional feedback. */
 export async function addSession(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.params.userId as string;
-    const { domain, trackId, difficulty, focusTopic, durationSeconds } = req.body as {
+    const { domain, trackId, difficulty, focusTopic, durationSeconds, feedback } = req.body as {
       domain: string;
       trackId?: string | null;
       difficulty?: DifficultyLevel;
       focusTopic?: string;
       durationSeconds?: number | null;
+      feedback?: {
+        score: number;
+        feedback_summary: string;
+        strengths: string[];
+        weaknesses: string[];
+      } | null;
     };
     if (!userId) {
       res.status(400).json({ success: false, error: 'userId is required' });
@@ -135,6 +163,7 @@ export async function addSession(req: Request, res: Response): Promise<void> {
       difficulty,
       focusTopic,
       durationSeconds,
+      feedback: feedback ?? null,
     });
     res.status(201).json({ success: true, data: session });
   } catch (err) {
