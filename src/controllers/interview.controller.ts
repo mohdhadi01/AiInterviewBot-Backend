@@ -6,18 +6,98 @@ const groqApiKey = process.env.GROQ_API_KEY;
 const CHAT_MODEL = 'llama-3.1-8b-instant';
 const ANALYZE_MODEL = 'llama-3.3-70b-versatile';
 
-const SYSTEM_PROMPT_GREETING = `You are a professional technical interviewer. Your tone is warm and encouraging.
-When the conversation has just started (no prior messages from the candidate), respond with a brief warm greeting and ask the candidate to introduce themselves. Keep it to 1-2 short sentences. Do not ask a technical question yet.`;
+// const SYSTEM_PROMPT_GREETING = `You are a professional technical interviewer. Your tone is warm and encouraging.
+// When the conversation has just started (no prior messages from the candidate), respond with a brief warm greeting and ask the candidate to introduce themselves.
+// Keep it to 1-2 short sentences. Do not ask a technical question yet.
 
-const SYSTEM_PROMPT_INTERVIEW = `You are a professional technical interviewer. Follow these rules strictly:
-- Keep every response concise (2-4 sentences max).
-- Never repeat a question that was already asked in this conversation.
-- After the candidate answers, briefly acknowledge their answer (e.g. "Good point", "Thanks for that") in one short phrase, then ask exactly one new technical question.
-- The question must match the domain and difficulty given below. When a "Focus area" is specified, ask about that specific area (e.g. React, Hooks, Node.js), not just the broad domain.
-- Output only the interviewer's reply text—no labels, no "Interviewer:", no markdown.`;
+// Very important: respond in STRICTLY valid JSON with exactly these fields:
+// - feedback: a string. For the first turn this MUST be an empty string "".
+// - question: a string. This should contain your spoken greeting / introduction request only.
 
-const SYSTEM_PROMPT_ANALYZE = `You are an expert hiring manager. Output strictly valid JSON with fields: score (number), feedback_summary (string), strengths (array), weaknesses (array).`;
+// Do not include any other keys, markdown, code fences, or explanatory text.`;
 
+// const SYSTEM_PROMPT_INTERVIEW = `You are a professional technical interviewer. Follow these rules strictly:
+// - Keep every response concise (2-4 sentences max overall).
+// - Never repeat a question that was already asked in this conversation.
+// - After the candidate answers, briefly acknowledge their answer in ONE short, natural phrase that is varied over time.
+//   - Examples: "Nice example about X", "I see what you mean about Y", "That's a reasonable approach", "Interesting perspective".
+//   - Do NOT overuse generic phrases like "Good point" or "Thanks for that". Avoid repeating the same opening line across turns.
+//   - Tailor the feedback to the content of the candidate's answer when possible.
+// - Then ask exactly ONE new technical question.
+// - The question must match the domain and difficulty given below. When a "Focus area" is specified, ask about that specific area (e.g. React, Hooks, Node.js), not just the broad domain.
+
+// Very important: respond in STRICTLY valid JSON with exactly these fields:
+// - feedback: a short string (1 sentence max) containing ONLY your brief acknowledgement of their last answer. Do NOT restate the question here.
+// - question: a string containing EXACTLY ONE new technical interview question.
+
+// Do not include any other keys, markdown, code fences, or explanatory text.`;
+
+// const SYSTEM_PROMPT_ANALYZE = `You are an expert hiring manager. Output strictly valid JSON with fields: score (number), feedback_summary (string), strengths (array), weaknesses (array).`;
+
+
+const SYSTEM_PROMPT_GREETING = `
+You are a Senior Technical Hiring Manager at a top-tier tech company. 
+Your tone is professional, warm, and inviting, but efficient.
+
+Task:
+1. Start with a friendly "Hello" using the candidate's name if available.
+2. Briefly state the purpose of this session (a technical screening).
+3. Ask the candidate to introduce themselves, focusing on their technical background.
+
+Constraints:
+- Keep it under 2 short sentences.
+- Do NOT ask a specific technical question yet (wait for the introduction).
+
+Output strictly valid JSON:
+{
+  "feedback": "",
+  "question": "your greeting string here"
+}
+`;
+
+const SYSTEM_PROMPT_INTERVIEW = `
+You are a Senior Technical Interviewer. 
+Your goal is to assess depth of knowledge with a fast-paced, conversational flow.
+
+RULES FOR FEEDBACK (Micro-Feedback Only):
+- **Strict Limit:** Max 10-15 words.
+- **Be Relatable:** Mention EXACTLY ONE specific keyword they used to prove you listened.
+- **Style:** Natural, conversational fragments.
+- Examples:
+  - Correct: "Spot on regarding the dependency array."
+  - Vagueness: "You're close, specifically on the memory management side."
+  - Wrong: "Not quite—that's actually for class components."
+
+RULES FOR QUESTIONING:
+- Ask exactly ONE new technical question.
+- The question must match the Domain, Topic, and Difficulty Level provided in the context below.
+- Do NOT repeat questions.
+
+Output strictly valid JSON:
+{
+  "feedback": "Your micro-feedback (Max 15 words, must cite a keyword).",
+  "question": "Your new technical question."
+}
+`;
+
+const SYSTEM_PROMPT_ANALYZE = `
+You are the Bar Raiser (Final Decision Maker) on a Hiring Committee. 
+Analyze the interview transcript provided.
+
+SCORING RUBRIC:
+- 0-40: Fails basic concepts.
+- 41-70: Good, but lacks depth or missed edge cases.
+- 71-90: Strong, production-ready knowledge.
+- 91-100: Expert level, deep understanding of internals.
+
+OUTPUT INSTRUCTIONS:
+- score: An integer (0-100) based on the rubric.
+- feedback_summary: A 2-3 sentence executive summary. Was it a "Hire" or "No Hire"? Why?
+- strengths: A list of specific concepts the candidate explained well (e.g., "Strong grasp of React Lifecycle").
+- weaknesses: A list of specific gaps found (e.g., "Missed error handling in async functions", "Confused useMemo vs useCallback").
+
+Output strictly valid JSON matching the AnalyzeResult interface.
+`;
 export interface ChatHistoryMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -31,8 +111,10 @@ export interface ChatRequestBody {
   difficulty?: string;
   /** Alias for difficulty; frontend may send either level or difficulty. */
   level?: string;
-  /** Match frontend Redux: focusTopic from SetupScreen selectedTopic — "General" or a focus area (e.g. "React", "Hooks"). When not "General", questions target this focus. */
+  /** Legacy single focus topic — \"General\" or one area (e.g. \"React\"). */
   focusTopic?: string;
+  /** New: multiple selected focus areas, e.g. [\"Hooks\", \"Performance\"]. */
+  focusTopics?: string[];
   /** Optional fallback topic if domain not sent (e.g. track title). */
   topic?: string;
 }
@@ -46,6 +128,26 @@ export interface AnalyzeResult {
   feedback_summary: string;
   strengths: string[];
   weaknesses: string[];
+}
+
+export interface ChatTurnResult {
+  feedback: string;
+  question: string;
+}
+
+/** From a combined feedback+question string, extract just the final question sentence. */
+function extractQuestionFromText(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return '';
+
+  // Grab the last sentence that ends with a question mark.
+  const match = trimmed.match(/([^?]*\?)(?![\s\S]*\?)/);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+
+  // Fallback: return full text when no clear question sentence is found.
+  return trimmed;
 }
 
 function isRateLimitError(err: unknown): boolean {
@@ -65,18 +167,34 @@ export async function chat(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const { history = [], topic = '', level = '', difficulty = '', domain = '', focusTopic = '' } = req.body as ChatRequestBody;
+    const {
+      history = [],
+      topic = '',
+      level = '',
+      difficulty = '',
+      domain = '',
+      focusTopic = '',
+      focusTopics = [],
+    } = req.body as ChatRequestBody;
     const safeHistory = Array.isArray(history) ? history : [];
     const topicStr = typeof topic === 'string' ? topic : '';
     const domainStr = typeof domain === 'string' ? domain : '';
     const focusStr = typeof focusTopic === 'string' ? focusTopic.trim() : '';
+    const focusList = Array.isArray(focusTopics)
+      ? focusTopics.map((f) => String(f).trim()).filter((f) => f && f.toLowerCase() !== 'general')
+      : [];
     const levelStr = (typeof difficulty === 'string' && difficulty) ? difficulty : (typeof level === 'string' && level) ? level : 'Mid';
 
     const groq = new Groq({ apiKey: groqApiKey });
 
-    const hasFocus = focusStr.length > 0 && focusStr.toLowerCase() !== 'general';
-    const contextLine = hasFocus
-      ? `Domain: ${domainStr || topicStr || 'general'}. Focus area (ask questions about this): ${focusStr}. Difficulty level: ${levelStr}.`
+    const hasFocusArray = focusList.length > 0;
+    const hasSingleFocus = focusStr.length > 0 && focusStr.toLowerCase() !== 'general';
+    const allFocuses = hasFocusArray ? focusList : hasSingleFocus ? [focusStr] : [];
+    const focusLabel = allFocuses.join(', ');
+
+    const hasAnyFocus = allFocuses.length > 0;
+    const contextLine = hasAnyFocus
+      ? `Domain: ${domainStr || topicStr || 'general'}. Focus areas (ask questions about these): ${focusLabel}. Difficulty level: ${levelStr}.`
       : `Current topic: ${topicStr || domainStr || 'general'}. Difficulty level: ${levelStr}.`;
 
     const isFirstTurn = safeHistory.length === 0;
@@ -96,10 +214,30 @@ export async function chat(req: Request, res: Response): Promise<void> {
       messages,
       max_tokens: 256,
       temperature: 0.7,
+      // Ask model to return a JSON object to make parsing more reliable
+      response_format: { type: 'json_object' },
     });
 
     const content = completion.choices[0]?.message?.content?.trim() ?? '';
-    res.json({ success: true, data: { message: content } });
+
+    let parsed: ChatTurnResult = { feedback: '', question: '' };
+    if (content) {
+      try {
+        const raw = JSON.parse(content) as Partial<ChatTurnResult>;
+        const feedback = typeof raw.feedback === 'string' ? raw.feedback.trim() : '';
+        const rawQuestion = typeof raw.question === 'string' ? raw.question : '';
+        const cleanedQuestion = extractQuestionFromText(rawQuestion);
+        parsed = {
+          feedback,
+          question: cleanedQuestion || feedback || '',
+        };
+      } catch {
+        // Fallback: treat entire text as the question if JSON parsing fails
+        parsed = { feedback: '', question: extractQuestionFromText(content) };
+      }
+    }
+
+    res.json({ success: true, data: parsed });
   } catch (err) {
     if (isRateLimitError(err)) {
       res.status(503).json({ success: false, error: 'Server busy. Please try again in a moment.' });
