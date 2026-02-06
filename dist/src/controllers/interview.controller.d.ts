@@ -11,8 +11,10 @@ export interface ChatRequestBody {
     difficulty?: string;
     /** Alias for difficulty; frontend may send either level or difficulty. */
     level?: string;
-    /** Match frontend Redux: focusTopic from SetupScreen selectedTopic — "General" or a focus area (e.g. "React", "Hooks"). When not "General", questions target this focus. */
+    /** Legacy single focus topic — \"General\" or one area (e.g. \"React\"). */
     focusTopic?: string;
+    /** New: multiple selected focus areas, e.g. [\"Hooks\", \"Performance\"]. */
+    focusTopics?: string[];
     /** Optional fallback topic if domain not sent (e.g. track title). */
     topic?: string;
 }
@@ -24,6 +26,10 @@ export interface AnalyzeResult {
     feedback_summary: string;
     strengths: string[];
     weaknesses: string[];
+}
+export interface ChatTurnResult {
+    feedback: string;
+    question: string;
 }
 /**
  * POST /api/chat
