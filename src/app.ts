@@ -6,6 +6,7 @@ import trackRoutes from './routes/track.routes.js';
 import focusRoutes from './routes/focus.routes.js';
 import userRoutes from './routes/user.routes.js';
 import interviewRoutes from './routes/interview.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use(async (_req: Request, _res: Response, next: NextFunction) => {
 app.use('/api/tracks', trackRoutes);
 app.use('/api/focus', focusRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api', interviewRoutes);
 
 app.use((_req, res) => {
