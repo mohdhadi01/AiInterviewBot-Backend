@@ -5,6 +5,8 @@ export interface ChatHistoryMessage {
 }
 export interface ChatRequestBody {
     history: ChatHistoryMessage[];
+    /** Candidate's display name; used in greeting when provided. */
+    name?: string;
     /** Match frontend Redux: domain from track.domain (e.g. "Frontend", "Backend"). */
     domain?: string;
     /** Match frontend Redux: difficulty from state.interview.difficulty — "Junior" | "Mid" | "Senior". Accepted as "level" or "difficulty". */

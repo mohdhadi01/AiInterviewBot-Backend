@@ -6,6 +6,7 @@ import focusRoutes from './routes/focus.routes.js';
 import userRoutes from './routes/user.routes.js';
 import interviewRoutes from './routes/interview.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import announcementRoutes from './routes/announcement.routes.js';
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -32,6 +33,7 @@ app.use('/api/tracks', trackRoutes);
 app.use('/api/focus', focusRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api', announcementRoutes);
 app.use('/api', interviewRoutes);
 app.use((_req, res) => {
     res.status(404).json({ success: false, error: 'Not found' });
